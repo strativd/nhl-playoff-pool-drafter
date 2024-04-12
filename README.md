@@ -96,8 +96,6 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 There are some things you need to change including title, urls, favicons, etc.
 
-Find all comments with !STARTERCONF, then follow the guide.
-
 Don't forget to change the package name in package.json
 
 ### 5. Commit Message Convention

@@ -1,7 +1,6 @@
 export const siteConfig = {
-  title: 'Next.js + Tailwind CSS + TypeScript Starter',
+  title: 'NHL Drafter',
   description:
-    'A starter for Next.js, Tailwind CSS, and TypeScript with Absolute Import, Seo, Link component, pre-configured with Husky',
-  /** Without additional '/' on the end, e.g. https://theodorusclarence.com */
-  url: 'https://tsnext-tw.thcl.dev',
+    'Draft an NHL Playoff pool team for your fantasy hockey playoff pool by selecting teams and players using the NHL API.',
+  url: 'https://nhl.stratbarrett.dev',
 };
