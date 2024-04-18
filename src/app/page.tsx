@@ -1,36 +1,31 @@
 /* eslint-disable no-console */
 'use client';
 
-import { clsx } from 'clsx';
-import { useLiveQuery } from 'dexie-react-hooks';
 import * as React from 'react';
 import { HiMiniTrophy } from 'react-icons/hi2';
 import '@/lib/env';
 
-import { DrafterDb, TeamsData } from '@/database';
-import { MOCK_STANDINGS } from '@/database/mock-standings';
+import { cn } from '@/lib/utils';
+
+import { STANDINGS_JSON } from '@/database/mock-standings';
+import { MatchupData, TeamsData } from '@/database/types';
 
 import Button from '@/components/buttons/Button';
-
-const db = new DrafterDb();
-
-const { teams } = db;
+import { useDatabase, useMatchup, useTeam } from '@/components/hooks';
+import NextImage from '@/components/NextImage';
 
 // const BASE_URL = 'https://api-web.nhle.com';
 
 export default function HomePage() {
-  const playoffTeams = useLiveQuery(
-    () => teams.filter((team) => !!team.bracketCode).toArray(),
-    []
-  );
+  const db = useDatabase();
 
-  const handleClick = async () => {
+  const loadData = async () => {
     try {
       // TODO: Fetch teams from NHL API (with tunnel)
       // const res = await fetch(`${BASE_URL}/v1/standings/now`);
-      const { standings } = MOCK_STANDINGS;
+      const { standings } = STANDINGS_JSON;
       await db.setAllTeams(standings);
-      await db.setPlayoffTeams();
+      await db.setPlayoffMatchups();
     } catch (error) {
       console.error(error);
     }
@@ -38,98 +33,48 @@ export default function HomePage() {
 
   return (
     <main className='bg-slate-600 p-10'>
-      <h1 className='text-5xl text-center text-white'>Playoff bracket</h1>
-      <Bracket playoffTeams={playoffTeams} />
-      <div>
-        <Button onClick={handleClick}>Load teams</Button>
+      <div className='flex justify-between align-middle mb-6'>
+        <h1 className='text-5xl text-white'>Playoff bracket</h1>
+        <div className='flex gap-3'>
+          {db ? (
+            <Button variant='outline' onClick={async () => await db.delete()}>
+              Delete DB
+            </Button>
+          ) : (
+            <Button variant='outline' onClick={loadData}>
+              Load teams
+            </Button>
+          )}
+        </div>
       </div>
+      <Bracket />
     </main>
   );
 }
 
-type BracketProps = {
-  playoffTeams?: TeamsData[];
-};
-
-type TeamsByBracketCodeMap = Record<string, TeamsData>;
-
-const Bracket: React.FC<BracketProps> = ({ playoffTeams }) => {
-  const teamsByBracketCode: TeamsByBracketCodeMap = React.useMemo(() => {
-    const teamsMap: TeamsByBracketCodeMap = {};
-    playoffTeams?.map((team) => {
-      if (!team.bracketCode.length) return;
-      teamsMap[team.bracketCode] = team;
-    });
-    return teamsMap;
-  }, [playoffTeams]);
-
+const Bracket: React.FC = () => {
   return (
     <div className='grid grid-cols-2 grid-rows-2'>
-      <BracketDivision
-        divisionName='Atlantic'
-        teamsOrdered={
-          [
-            teamsByBracketCode['A1'],
-            teamsByBracketCode['A2'],
-            teamsByBracketCode['A3'],
-            teamsByBracketCode['A4'],
-          ].filter(Boolean) as TeamsData[]
-        }
-      />
-      <BracketDivision
-        divisionName='Central'
-        reverseLayout
-        teamsOrdered={
-          [
-            teamsByBracketCode['C1'],
-            teamsByBracketCode['C2'],
-            teamsByBracketCode['C3'],
-            teamsByBracketCode['C4'],
-          ].filter(Boolean) as TeamsData[]
-        }
-      />
-      <BracketDivision
-        divisionName='Metro'
-        teamsOrdered={
-          [
-            teamsByBracketCode['M1'],
-            teamsByBracketCode['M2'],
-            teamsByBracketCode['M3'],
-            teamsByBracketCode['M4'],
-          ].filter(Boolean) as TeamsData[]
-        }
-      />
-      <BracketDivision
-        divisionName='Pacific'
-        reverseLayout
-        teamsOrdered={
-          [
-            teamsByBracketCode['P1'],
-            teamsByBracketCode['P2'],
-            teamsByBracketCode['P3'],
-            teamsByBracketCode['P4'],
-          ].filter(Boolean) as TeamsData[]
-        }
-      />
+      <BracketDivision division='A' conference='E' />
+      <BracketDivision division='C' conference='W' reverseLayout />
+      <BracketDivision division='M' conference='E' />
+      <BracketDivision division='P' conference='W' reverseLayout />
     </div>
   );
 };
 
 type BracketDivisionProps = {
-  divisionName?: string;
+  division: TeamsData['division'];
+  conference: TeamsData['conference'];
   reverseLayout?: boolean;
-  teamsOrdered: TeamsData[];
 };
 
 const BracketDivision: React.FC<BracketDivisionProps> = ({
-  teamsOrdered,
+  division,
+  conference,
   reverseLayout,
 }) => {
-  const [winnerR1A, setWinnerR1A] = React.useState<TeamsData | undefined>();
-  const [winnerR1B, setWinnerR1B] = React.useState<TeamsData | undefined>();
-  const [winnerR2, setWinnerR2] = React.useState<TeamsData | undefined>();
-
-  const containerClasses = clsx(
+  const containerClasses = cn(
     'flex gap-5 items-start min-h-72',
     reverseLayout ? 'flex-row-reverse' : 'flex-row'
   );
@@ -138,27 +83,21 @@ const BracketDivision: React.FC<BracketDivisionProps> = ({
     <div className={containerClasses}>
       <div>
         <PlayoffMatch
-          homeTeam={teamsOrdered[0]}
-          awayTeam={teamsOrdered[3]}
+          matchupId={`${division}:Div1`}
+          conference={conference}
           reverseLayout={reverseLayout}
-          winner={winnerR1A}
-          setWinner={setWinnerR1A}
         />
         <PlayoffMatch
-          homeTeam={teamsOrdered[1]}
-          awayTeam={teamsOrdered[2]}
+          matchupId={`${division}:Div2`}
+          conference={conference}
           reverseLayout={reverseLayout}
-          winner={winnerR1B}
-          setWinner={setWinnerR1B}
         />
       </div>
       <div className='flex flex-col items-start justify-around min-h-72'>
         <PlayoffMatch
-          homeTeam={winnerR1A}
-          awayTeam={winnerR1B}
+          matchupId={`${division}:DivFinals`}
+          conference={conference}
           reverseLayout={reverseLayout}
-          winner={winnerR2}
-          setWinner={setWinnerR2}
         />
       </div>
     </div>
@@ -166,21 +105,18 @@ const BracketDivision: React.FC<BracketDivisionProps> = ({
 };
 
 type PlayoffMatchProps = {
-  homeTeam?: TeamsData;
-  awayTeam?: TeamsData;
+  matchupId: MatchupData['matchupId'];
+  conference: TeamsData['conference'];
   reverseLayout?: boolean;
-  winner?: TeamsData;
-  setWinner: (team: TeamsData) => void;
 };
 
 const PlayoffMatch: React.FC<PlayoffMatchProps> = ({
-  homeTeam,
-  awayTeam,
+  matchupId,
   reverseLayout,
-  winner,
-  setWinner,
 }) => {
-  const containerClasses = clsx(
+  const { matchup, setWinner } = useMatchup(matchupId);
+
+  const containerClasses = cn(
     'flex gap-3 items-start',
     reverseLayout ? 'flex-row-reverse' : 'flex-row'
   );
@@ -188,32 +124,56 @@ const PlayoffMatch: React.FC<PlayoffMatchProps> = ({
   return (
     <div className={containerClasses}>
       <div className='flex flex-col gap-3 items-start min-h-36'>
-        <TeamButton team={homeTeam} onClick={setWinner} />
-        <TeamButton team={awayTeam} onClick={setWinner} />
+        <TeamButton
+          teamId={matchup?.homeTeamId}
+          onClick={matchup ? (team) => setWinner(team.id) : undefined}
+          disabled={!matchup?.homeTeamId || !matchup?.awayTeamId}
+        />
+        <TeamButton
+          teamId={matchup?.awayTeamId}
+          onClick={matchup ? (team) => setWinner(team.id) : undefined}
+          disabled={!matchup?.homeTeamId || !matchup?.awayTeamId}
+        />
       </div>
       <div className='flex flex-col justify-around items-start min-h-32'>
-        <TeamButton team={winner} onClick={setWinner} />
+        <TeamButton teamId={matchup?.winnerTeamId} disabled={true} />
       </div>
     </div>
   );
 };
 
 type TeamButtonProps = {
-  team?: TeamsData;
-  onClick: (team: TeamsData) => void;
+  teamId?: string;
+  disabled?: boolean;
+  onClick?: (team: TeamsData) => void;
 };
 
-const TeamButton: React.FC<TeamButtonProps> = ({ team, onClick }) => {
+const TeamButton: React.FC<TeamButtonProps> = ({
+  teamId,
+  disabled,
+  onClick,
+}) => {
+  const team = useTeam(teamId);
+
   return team ? (
     <Button
-      onClick={() => onClick(team)}
+      onClick={() => onClick?.(team)}
       className='min-h-14 min-w-20 flex justify-center align-middle'
+      disabled={disabled}
     >
-      {/* <Image height={50} width={50} src={team.logo} alt={team.name} /> */}
-      {team.abbr}
+      <NextImage
+        className='w-auto h-auto'
+        height={50}
+        width={50}
+        src={team.logo}
+        alt={team.name}
+      />
     </Button>
   ) : (
-    <Button className='min-h-14 min-w-20 flex justify-center align-middle'>
+    <Button
+      className='min-h-14 min-w-20 flex justify-center align-middle'
+      variant='outline'
+    >
       <HiMiniTrophy size={30} color='white' />
     </Button>
   );

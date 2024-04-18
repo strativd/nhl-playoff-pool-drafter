@@ -1,3 +1,53 @@
+type Division = 'A' | 'C' | 'M' | 'P';
+
+export type TeamsData = {
+  id: string; //= abbr
+  abbr: string;
+  name: string;
+  division: Division;
+  conference: 'E' | 'W';
+  rankInConf: number;
+  rankInDiv: number;
+  rankInWild: number;
+  points: number;
+  eliminated: boolean;
+  logo: string;
+  seriesWins: number;
+  // players: number[];
+};
+
+type MatchupsPerDivision = 'Div1' | 'Div2' | 'DivFinals';
+
+export type MatchupData = {
+  id?: number;
+  matchupId: `${Division}:${MatchupsPerDivision}`;
+  nextMatchupId?: `${Division}:DivFinals`;
+  division: Division;
+  conference: 'E' | 'W';
+  homeTeamId?: string;
+  awayTeamId?: string;
+  winnerTeamId?: string;
+};
+
+export type PlayersData = {
+  id?: number;
+  team: string;
+  teamId: number;
+  watching: boolean;
+  drafted: boolean;
+  name: string;
+  position: 'C' | 'LW' | 'RW' | 'D';
+  goals: number;
+  assists: number;
+  points: number;
+  powerPlayPoints: number;
+  powerPlayUnit?: 1 | 2;
+  shortHandedPoints: number;
+  gamesPlayed: number;
+  totalSecondsOnIce: number;
+  averageSecondsOnIce: number;
+};
+
 /**
  * Player summary response type
  */
