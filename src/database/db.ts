@@ -1,11 +1,9 @@
 import Dexie from 'dexie';
 
-import {
-  MatchupData,
-  PlayersData,
-  TeamsData,
-  TeamStanding,
-} from '@/database/types';
+import { STANDINGS_JSON } from '@/database/mock-standings';
+import { MatchupData, PlayersData, TeamsData } from '@/database/types';
+
+// const BASE_URL = 'https://api-web.nhle.com';
 
 export class DrafterDb extends Dexie {
   teams!: Dexie.Table<TeamsData, number>;
@@ -15,18 +13,19 @@ export class DrafterDb extends Dexie {
   constructor() {
     super('DrafterDb');
 
-    this.version(1).stores({
-      /* TODO: Add players */
+    this.version(2).stores({
       teams:
         'id,name,abbr,division,conference,rankInConf,rankInDiv,rankInWild,points,eliminated,logo,bracketCode,seriesWins',
       matchups:
         '++id,division,conference,matchupId,homeTeamId,awayTeamId,winnerTeamId',
       players:
-        '++id,team,watching,drafted,name,position,goals,assists,points,powerPlayPoints,powerPlayUnit,shortHandedPoints,gamesPlayed,totalSecondsOnIce,averageSecondsOnIce',
+        '++id,team,teamId,watching,drafted,name,position,goals,assists,points,powerPlayPoints,powerPlayUnit,shortHandedPoints,gamesPlayed,totalSecondsOnIce,averageSecondsOnIce',
     });
   }
 
-  setAllTeams = async (standings: TeamStanding[]) => {
+  setAllTeams = async () => {
+    const standings = STANDINGS_JSON.standings;
+    // const res = await fetch(`${BASE_URL}/v1/standings/now`);
     const teams: TeamsData[] = [];
     standings.forEach((standing) => {
       const team: TeamsData = {

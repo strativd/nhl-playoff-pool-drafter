@@ -13,7 +13,6 @@ export type TeamsData = {
   eliminated: boolean;
   logo: string;
   seriesWins: number;
-  // players: number[];
 };
 
 type MatchupsPerDivision = 'Div1' | 'Div2' | 'DivFinals';
@@ -31,8 +30,8 @@ export type MatchupData = {
 
 export type PlayersData = {
   id?: number;
-  team: string;
-  teamId: number;
+  team: TeamsData;
+  teamId: TeamsData['id'];
   watching: boolean;
   drafted: boolean;
   name: string;
