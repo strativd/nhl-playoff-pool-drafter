@@ -35,7 +35,7 @@ export type PlayersData = {
   watching: boolean;
   drafted: boolean;
   name: string;
-  position: 'C' | 'LW' | 'RW' | 'D';
+  position: string;
   goals: number;
   assists: number;
   points: number;

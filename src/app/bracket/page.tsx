@@ -6,6 +6,7 @@ import '@/lib/env';
 
 import Button from '@/components/buttons/Button';
 import { useDatabase } from '@/components/hooks';
+import ArrowLink from '@/components/links/ArrowLink';
 
 import { BracketDivision } from './components/BracketDivision';
 
@@ -35,6 +36,9 @@ export default function HomePage() {
               Load teams
             </Button>
           )}
+          <ArrowLink href='/' variant='ghost'>
+            Draft board
+          </ArrowLink>
         </div>
       </div>
 

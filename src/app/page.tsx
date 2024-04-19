@@ -1,180 +1,219 @@
 /* eslint-disable no-console */
 'use client';
 
+import {
+  ColumnDef,
+  flexRender,
+  getCoreRowModel,
+  getSortedRowModel,
+  SortingState,
+  useReactTable,
+} from '@tanstack/react-table';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { Table } from 'flowbite-react';
 import * as React from 'react';
-import { HiMiniTrophy } from 'react-icons/hi2';
 import '@/lib/env';
 
-import { cn } from '@/lib/utils';
-
-import { STANDINGS_JSON } from '@/database/mock-standings';
-import { MatchupData, TeamsData } from '@/database/types';
+import { PlayersData } from '@/database';
 
 import Button from '@/components/buttons/Button';
-import { useDatabase, useMatchup, useTeam } from '@/components/hooks';
-import NextImage from '@/components/NextImage';
+import { useDatabase } from '@/components/hooks';
+import ArrowLink from '@/components/links/ArrowLink';
 
 // const BASE_URL = 'https://api-web.nhle.com';
 
 export default function HomePage() {
   const db = useDatabase();
 
-  const loadData = async () => {
+  const players = useLiveQuery<PlayersData[]>(
+    () =>
+      (async () => {
+        const data = await db.players.toArray();
+        return data;
+      })(),
+    [],
+  );
+
+  const loadPlayers = async () => {
     try {
-      // TODO: Fetch teams from NHL API (with tunnel)
-      // const res = await fetch(`${BASE_URL}/v1/standings/now`);
-      const { standings } = STANDINGS_JSON;
-      await db.setAllTeams(standings);
-      await db.setPlayoffMatchups();
+      await db.setAllPlayers();
     } catch (error) {
       console.error(error);
     }
   };
 
   return (
-    <main className='bg-slate-600 p-10'>
+    <main className=' p-10'>
       <div className='flex justify-between align-middle mb-6'>
-        <h1 className='text-5xl text-white'>Playoff bracket</h1>
+        <h1 className='text-5xl'>Draft board</h1>
         <div className='flex gap-3'>
-          {db ? (
-            <Button variant='outline' onClick={async () => await db.delete()}>
-              Delete DB
-            </Button>
-          ) : (
-            <Button variant='outline' onClick={loadData}>
-              Load teams
-            </Button>
-          )}
+          <Button variant='outline' onClick={loadPlayers}>
+            Load players
+          </Button>
+          <ArrowLink href='/bracket'>Playoff bracket</ArrowLink>
         </div>
       </div>
-      <Bracket />
+
+      {players && <PlayerList players={players} />}
     </main>
   );
 }
 
-const Bracket: React.FC = () => {
+type PlayerListProps = {
+  players: PlayersData[];
+};
+
+export const PlayerList: React.FC<PlayerListProps> = ({ players }) => {
+  const [sorting, setSorting] = React.useState<SortingState>([]);
+
+  const columns = React.useMemo<ColumnDef<PlayersData>[]>(
+    () => [
+      {
+        accessorKey: 'teamId',
+        header: 'Team',
+        id: 'teamId',
+      },
+      {
+        accessorKey: 'position',
+        header: 'Pos',
+      },
+      {
+        accessorKey: 'name',
+        header: 'Name',
+        id: 'name',
+      },
+      {
+        accessorKey: 'goals',
+        header: 'G',
+      },
+      {
+        accessorKey: 'assists',
+        header: 'A',
+      },
+      {
+        accessorKey: 'points',
+        header: 'P',
+      },
+      {
+        accessorKey: 'powerPlayPoints',
+        header: 'PP',
+      },
+      {
+        accessorKey: 'shortHandedPoints',
+        header: 'SH',
+      },
+      {
+        accessorKey: 'gamesPlayed',
+        header: 'GP',
+      },
+      {
+        accessorKey: 'averageSecondsOnIce',
+        header: 'TOI/G',
+        cell: (cell) => {
+          const value = cell.getValue() as number;
+          const mins = Math.floor(value / 60);
+          const secs = Math.floor(value % 60);
+          return `${mins}:${secs.toString().padStart(2, '0')}`;
+        },
+      },
+    ],
+    [],
+  );
+
+  const table = useReactTable({
+    columns,
+    data: players,
+    debugTable: true,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(), //client-side sorting
+    onSortingChange: setSorting, //optionally control sorting state in your own scope for easy access
+    // sortingFns: {
+    //   sortStatusFn, //or provide our custom sorting function globally for all columns to be able to use
+    // },
+    //no need to pass pageCount or rowCount with client-side pagination as it is calculated automatically
+    state: {
+      sorting,
+    },
+    // autoResetPageIndex: false, // turn off page index reset when sorting or filtering - default on/true
+    // enableMultiSort: false, //Don't allow shift key to sort multiple columns - default on/true
+    // enableSorting: false, // - default on/true
+    // enableSortingRemoval: false, //Don't allow - default on/true
+    // isMultiSortEvent: (e) => true, //Make all clicks multi-sort - default requires `shift` key
+    // maxMultiSortColCount: 3, // only allow 3 columns to be sorted at once - default is Infinity
+  });
+
   return (
-    <div className='grid grid-cols-2 grid-rows-2'>
-      <BracketDivision division='A' conference='E' />
-      <BracketDivision division='C' conference='W' reverseLayout />
-      <BracketDivision division='M' conference='E' />
-      <BracketDivision division='P' conference='W' reverseLayout />
-    </div>
-  );
-};
-
-type BracketDivisionProps = {
-  division: TeamsData['division'];
-  conference: TeamsData['conference'];
-  reverseLayout?: boolean;
-};
-
-const BracketDivision: React.FC<BracketDivisionProps> = ({
-  division,
-  conference,
-  reverseLayout,
-}) => {
-  const containerClasses = cn(
-    'flex gap-5 items-start min-h-72',
-    reverseLayout ? 'flex-row-reverse' : 'flex-row'
-  );
-
-  return (
-    <div className={containerClasses}>
-      <div>
-        <PlayoffMatch
-          matchupId={`${division}:Div1`}
-          conference={conference}
-          reverseLayout={reverseLayout}
-        />
-        <PlayoffMatch
-          matchupId={`${division}:Div2`}
-          conference={conference}
-          reverseLayout={reverseLayout}
-        />
-      </div>
-      <div className='flex flex-col items-start justify-around min-h-72'>
-        <PlayoffMatch
-          matchupId={`${division}:DivFinals`}
-          conference={conference}
-          reverseLayout={reverseLayout}
-        />
-      </div>
-    </div>
-  );
-};
-
-type PlayoffMatchProps = {
-  matchupId: MatchupData['matchupId'];
-  conference: TeamsData['conference'];
-  reverseLayout?: boolean;
-};
-
-const PlayoffMatch: React.FC<PlayoffMatchProps> = ({
-  matchupId,
-  reverseLayout,
-}) => {
-  const { matchup, setWinner } = useMatchup(matchupId);
-
-  const containerClasses = cn(
-    'flex gap-3 items-start',
-    reverseLayout ? 'flex-row-reverse' : 'flex-row'
-  );
-
-  return (
-    <div className={containerClasses}>
-      <div className='flex flex-col gap-3 items-start min-h-36'>
-        <TeamButton
-          teamId={matchup?.homeTeamId}
-          onClick={matchup ? (team) => setWinner(team.id) : undefined}
-          disabled={!matchup?.homeTeamId || !matchup?.awayTeamId}
-        />
-        <TeamButton
-          teamId={matchup?.awayTeamId}
-          onClick={matchup ? (team) => setWinner(team.id) : undefined}
-          disabled={!matchup?.homeTeamId || !matchup?.awayTeamId}
-        />
-      </div>
-      <div className='flex flex-col justify-around items-start min-h-32'>
-        <TeamButton teamId={matchup?.winnerTeamId} disabled={true} />
+    <div>
+      <div className='flex gap-3'>
+        <div className='overflow-x-auto w-3/5'>
+          <Table striped align='left'>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <Table.Head key={headerGroup.id}>
+                {headerGroup.headers.map((header) => {
+                  return (
+                    <Table.HeadCell
+                      key={header.id}
+                      colSpan={header.colSpan}
+                      className='p-2'
+                    >
+                      {header.isPlaceholder ? null : (
+                        <div
+                          className={
+                            header.column.getCanSort()
+                              ? 'cursor-pointer select-none'
+                              : ''
+                          }
+                          onClick={header.column.getToggleSortingHandler()}
+                          title={
+                            header.column.getCanSort()
+                              ? header.column.getNextSortingOrder() === 'asc'
+                                ? 'Sort ascending'
+                                : header.column.getNextSortingOrder() === 'desc'
+                                  ? 'Sort descending'
+                                  : 'Clear sort'
+                              : undefined
+                          }
+                        >
+                          {flexRender(
+                            header.column.columnDef.header,
+                            header.getContext(),
+                          )}
+                          {{
+                            asc: ' 🔼',
+                            desc: ' 🔽',
+                          }[header.column.getIsSorted() as string] ?? null}
+                        </div>
+                      )}
+                    </Table.HeadCell>
+                  );
+                })}
+              </Table.Head>
+            ))}
+            <Table.Body>
+              {table
+                .getRowModel()
+                .rows.slice(0, 100)
+                .map((row) => {
+                  return (
+                    <Table.Row key={row.id}>
+                      {row.getVisibleCells().map((cell) => {
+                        return (
+                          <Table.Cell key={cell.id} className='p-2'>
+                            {flexRender(
+                              cell.column.columnDef.cell,
+                              cell.getContext(),
+                            )}
+                          </Table.Cell>
+                        );
+                      })}
+                    </Table.Row>
+                  );
+                })}
+            </Table.Body>
+          </Table>
+        </div>
+        <div className='flex w-2/5'></div>
       </div>
     </div>
-  );
-};
-
-type TeamButtonProps = {
-  teamId?: string;
-  disabled?: boolean;
-  onClick?: (team: TeamsData) => void;
-};
-
-const TeamButton: React.FC<TeamButtonProps> = ({
-  teamId,
-  disabled,
-  onClick,
-}) => {
-  const team = useTeam(teamId);
-
-  return team ? (
-    <Button
-      onClick={() => onClick?.(team)}
-      className='min-h-14 min-w-20 flex justify-center align-middle'
-      disabled={disabled}
-    >
-      <NextImage
-        className='w-auto h-auto'
-        height={50}
-        width={50}
-        src={team.logo}
-        alt={team.name}
-      />
-    </Button>
-  ) : (
-    <Button
-      className='min-h-14 min-w-20 flex justify-center align-middle'
-      variant='outline'
-    >
-      <HiMiniTrophy size={30} color='white' />
-    </Button>
   );
 };
