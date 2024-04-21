@@ -12,7 +12,7 @@ export type TeamsData = {
   points: number;
   eliminated: boolean;
   logo: string;
-  seriesWins: number;
+  seriesPlayed: number;
 };
 
 type MatchupsPerDivision = 'Div1' | 'Div2' | 'DivFinals';
@@ -45,6 +45,8 @@ export type PlayersData = {
   gamesPlayed: number;
   totalSecondsOnIce: number;
   averageSecondsOnIce: number;
+  expectedPoints: number;
+  pointsPerGame: number;
 };
 
 /**

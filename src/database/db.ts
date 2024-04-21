@@ -14,13 +14,13 @@ export class DrafterDb extends Dexie {
   constructor() {
     super('DrafterDb');
 
-    this.version(3).stores({
+    this.version(1).stores({
       teams:
-        'id,name,abbr,division,conference,rankInConf,rankInDiv,rankInWild,points,eliminated,logo,bracketCode,seriesWins',
+        'id,name,abbr,division,conference,rankInConf,rankInDiv,rankInWild,points,eliminated,logo,bracketCode,seriesPlayed',
       matchups:
         '++id,division,conference,matchupId,homeTeamId,awayTeamId,winnerTeamId',
       players:
-        '++id,team,teamId,watching,drafted,name,position,goals,assists,points,powerPlayPoints,powerPlayUnit,shortHandedPoints,gamesPlayed,totalSecondsOnIce,averageSecondsOnIce',
+        '++id,team,teamId,watching,drafted,name,position,goals,assists,points,powerPlayPoints,powerPlayUnit,shortHandedPoints,gamesPlayed,totalSecondsOnIce,averageSecondsOnIce,expectedPoints,pointsPerGame',
     });
   }
 
@@ -28,7 +28,7 @@ export class DrafterDb extends Dexie {
     const data = PLAYERS_JSON.data;
     const players: PlayersData[] = [];
     data.forEach(async (p) => {
-      const player: Omit<PlayersData, 'team' | 'teamId'> = {
+      const player: Omit<PlayersData, 'team' | 'teamId' | 'expectedPoints'> = {
         watching: false,
         drafted: false,
         name: p.skaterFullName,
@@ -41,7 +41,9 @@ export class DrafterDb extends Dexie {
         gamesPlayed: p.gamesPlayed,
         totalSecondsOnIce: p.timeOnIcePerGame * p.gamesPlayed,
         averageSecondsOnIce: p.timeOnIcePerGame,
+        pointsPerGame: +(p.points / p.gamesPlayed).toFixed(2),
       };
+      // add team data
       const teams = p.teamAbbrevs.split(',');
       const teamId = teams[teams.length - 1];
       const team = await this.teams.get({ id: teamId });
@@ -51,6 +53,12 @@ export class DrafterDb extends Dexie {
       const playoffPlayer = player as PlayersData;
       playoffPlayer.team = team;
       playoffPlayer.teamId = teamId;
+      // add expected stats
+      const seriesWins = playoffPlayer.team.seriesPlayed;
+      const expectedGames = seriesWins * 6;
+      const pointsPerGame = playoffPlayer.pointsPerGame;
+      const expectedPoints = pointsPerGame * expectedGames;
+      playoffPlayer.expectedPoints = +expectedPoints.toFixed(2);
       players.push(playoffPlayer);
     });
     await this.players.clear();
@@ -74,7 +82,7 @@ export class DrafterDb extends Dexie {
         rankInConf: standing.conferenceSequence,
         rankInDiv: standing.divisionSequence,
         rankInWild: standing.wildcardSequence,
-        seriesWins: 0,
+        seriesPlayed: 1,
       };
       teams.push(team);
     });
@@ -173,7 +181,65 @@ export class DrafterDb extends Dexie {
       } else {
         await this.matchups.update(nextMatchup, { awayTeamId: winnerTeamId });
       }
+      await this.matchups.update(nextMatchup, { winnerTeamId: undefined });
     }
     await this.matchups.update(matchup, { winnerTeamId });
+    await this.setMatchupWinnerSeriesPlayed(matchup, winnerTeamId);
+  };
+
+  // set winning team's series played based on the matchup that was won
+  setMatchupWinnerSeriesPlayed = async (
+    matchup: MatchupData,
+    winnerTeamId: string,
+  ) => {
+    const winningTeam = await this.teams.get({ id: winnerTeamId });
+    if (!winningTeam) throw new Error(`Winning team ${winnerTeamId} not found`);
+    const loserTeamId =
+      winnerTeamId === matchup.homeTeamId
+        ? matchup.awayTeamId
+        : matchup.homeTeamId;
+    if (!loserTeamId) throw new Error(`Loser team ${winnerTeamId} not found`);
+    const loserTeam = await this.teams.get({ id: loserTeamId });
+    if (!loserTeam) throw new Error(`Loser team ${winnerTeamId} not found`);
+
+    const seriesPlayed = matchup.nextMatchupId ? 2 : 3;
+    const seriesPlayedForLoser = seriesPlayed - 1;
+    await this.teams.update(winningTeam, { seriesPlayed });
+    await this.teams.update(loserTeam, { seriesPlayed: seriesPlayedForLoser });
+    await this.setPlayerExpectedPoints(matchup);
+  };
+
+  // set the expected points for the winning and loser teams
+  setPlayerExpectedPoints = async (matchup: MatchupData) => {
+    const players = await this.players
+      .filter(
+        (player) =>
+          player.teamId === matchup.homeTeamId ||
+          player.teamId === matchup.awayTeamId,
+      )
+      .toArray();
+
+    const homeTeam = await this.teams.get({ id: matchup.homeTeamId });
+    const awayTeam = await this.teams.get({ id: matchup.awayTeamId });
+    if (!homeTeam || !awayTeam)
+      throw new Error('Home or away team not found for matchup');
+
+    const expectedPoints = players.map((player) => {
+      const playersTeamId = player.teamId;
+      const playersTeam = playersTeamId === homeTeam.id ? homeTeam : awayTeam;
+      const seriesPlayed = playersTeam.seriesPlayed;
+      const expectedGames = seriesPlayed * 6;
+      const pointsPerGame = player.pointsPerGame;
+      return +(pointsPerGame * expectedGames).toFixed(2);
+    });
+
+    await this.players.bulkPut(
+      players.map((player, i) => {
+        return {
+          ...player,
+          expectedPoints: expectedPoints[i],
+        };
+      }),
+    );
   };
 }
