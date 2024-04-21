@@ -1,4 +1,4 @@
-import { HiMiniTrophy } from 'react-icons/hi2';
+import { Trophy } from 'lucide-react';
 
 import { TeamsData } from '@/database';
 
@@ -38,7 +38,7 @@ export const TeamButton: React.FC<TeamButtonProps> = ({
       className='min-h-14 min-w-20 flex justify-center align-middle'
       variant='outline'
     >
-      <HiMiniTrophy size={30} color='white' />
+      <Trophy size={30} color='white' />
     </Button>
   );
 };
