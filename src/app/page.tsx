@@ -30,6 +30,8 @@ export default function HomePage() {
     () =>
       (async () => {
         const data = await db.players
+          .orderBy('points')
+          .reverse()
           .filter((player) => !!player.watching && !player.drafted)
           .toArray();
         return data;
@@ -37,9 +39,14 @@ export default function HomePage() {
     [],
   );
 
-  const loadPlayers = async () => {
+  const handleLoadPlayers = async () => {
     try {
-      await db.setAllPlayers();
+      const confirmation = window.confirm(
+        'This will clear the current player list and data. Are you sure?',
+      );
+      if (confirmation) {
+        await db.setAllPlayers();
+      }
     } catch (error) {
       console.error(error);
     }
@@ -50,9 +57,10 @@ export default function HomePage() {
       <div className='flex justify-between align-middle mb-6'>
         <h1 className='text-5xl'>Draft board</h1>
         <div className='flex gap-3'>
-          <Button variant='outline' onClick={loadPlayers}>
+          <Button variant='outline' onClick={handleLoadPlayers}>
             Load players
           </Button>
+
           <ArrowLink href='/bracket'>Playoff bracket</ArrowLink>
         </div>
       </div>
