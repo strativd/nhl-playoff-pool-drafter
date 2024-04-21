@@ -24,39 +24,54 @@ type PlayerTableProps = {
 export const PlayerTable: React.FC<PlayerTableProps> = ({ players = [] }) => {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [filterName, setFilterName] = React.useState<string>('');
-  const [hideDrafted, setHideDrafted] = React.useState<boolean>(true);
+  const [hideDrafted, setHideDrafted] = React.useState<boolean>(false);
+  const prevHideDrafted = React.useRef<boolean>(hideDrafted);
 
   const { handleTeamChange, selectedTeams, teams } = useTeamsFilter();
 
-  const filteredPlayers = React.useMemo(
-    () => {
-      return players.filter((p) => {
-        let showPlayer = true;
-        if (hideDrafted) {
-          showPlayer = !p.drafted;
-        }
-        if (showPlayer && filterName.length) {
-          showPlayer = p.name.toLowerCase().includes(filterName.toLowerCase());
-        }
-        // TODO: Add filter for team
-        if (showPlayer && selectedTeams.length) {
-          showPlayer = selectedTeams.includes(p.teamId);
-        }
-        return showPlayer;
-      });
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  const filteredPlayers: PlayersData[] = React.useMemo(
+    () =>
+      filterName.length
+        ? players.filter((p) =>
+            p.name.toLowerCase().includes(filterName.toLowerCase()),
+          )
+        : players.filter((p) => {
+            let showPlayer = true;
+            if (hideDrafted) {
+              showPlayer = !p.drafted;
+            }
+            if (showPlayer && selectedTeams.length) {
+              showPlayer = selectedTeams.includes(p.teamId);
+            }
+            return showPlayer;
+          }),
     [filterName, players, hideDrafted, selectedTeams],
   );
 
   // Update the state when input changes
   const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value || '';
+    if (value.length > 0) {
+      setHideDrafted(false);
+    } else {
+      setHideDrafted(prevHideDrafted.current);
+    }
     setFilterName(value);
   };
 
   const columns = React.useMemo<ColumnDef<PlayersData>[]>(
     () => [
+      {
+        header: '✅',
+        cell: ({ row }) => (
+          <Table.Cell className='p-2 px-0 w-4'>
+            <DraftedCheckbox
+              isDrafted={row.original.drafted}
+              playerId={row.original.id}
+            />
+          </Table.Cell>
+        ),
+      },
       {
         accessorKey: 'teamId',
         header: 'Team',
@@ -72,17 +87,29 @@ export const PlayerTable: React.FC<PlayerTableProps> = ({ players = [] }) => {
         id: 'name',
       },
       {
-        header: 'P/G',
+        header: '👀',
+        cell: ({ row }) => (
+          <Table.Cell className='p-2 px-0 w-4'>
+            <WatchlistCheckbox
+              isWatching={row.original.watching}
+              playerId={row.original.id}
+            />
+          </Table.Cell>
+        ),
+      },
+      {
+        accessorKey: 'expectedPoints',
+        header: 'xPTS',
+        id: 'expected-points',
+      },
+      {
+        accessorKey: 'pointsPerGame',
+        header: 'PTS/G',
         id: 'points-per-game',
-        cell: (row) => {
-          const points = row.row.original.points;
-          const gamesPlayed = row.row.original.gamesPlayed;
-          return <b>{(points / gamesPlayed).toFixed(2)}</b>;
-        },
       },
       {
         accessorKey: 'points',
-        header: 'P',
+        header: 'PTS',
         id: 'points',
       },
       {
@@ -120,16 +147,12 @@ export const PlayerTable: React.FC<PlayerTableProps> = ({ players = [] }) => {
   );
 
   const table = useReactTable({
+    // debugTable: true,
     columns,
     data: filteredPlayers,
-    debugTable: true,
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(), //client-side sorting
-    onSortingChange: setSorting, //optionally control sorting state in your own scope for easy access
-    // sortingFns: {
-    //   sortStatusFn, //or provide our custom sorting function globally for all columns to be able to use
-    // },
-    //no need to pass pageCount or rowCount with client-side pagination as it is calculated automatically
+    getSortedRowModel: getSortedRowModel(),
+    onSortingChange: setSorting,
     state: {
       sorting,
     },
@@ -162,11 +185,18 @@ export const PlayerTable: React.FC<PlayerTableProps> = ({ players = [] }) => {
         <Checkbox
           id='show-drafted'
           checked={hideDrafted}
-          onChange={() => setHideDrafted(!hideDrafted)}
+          disabled={filterName.length > 0}
+          onChange={() => {
+            const value = !hideDrafted;
+            prevHideDrafted.current = value;
+            setHideDrafted(value);
+          }}
         />
         <Label className='text-white' htmlFor='show-drafted'>
           Hide drafted
         </Label>
+        <div className='grow' />
+        <Label className='text-white'>👀 → {filteredPlayers.length}</Label>
       </div>
 
       <div className='flex gap-1 m-4 justify-between'>
@@ -181,6 +211,7 @@ export const PlayerTable: React.FC<PlayerTableProps> = ({ players = [] }) => {
               className={classes}
               variant='basic'
               key={team}
+              disabled={filterName.length > 0}
               onClick={() => handleTeamChange(team)}
             >
               {team}
@@ -192,8 +223,6 @@ export const PlayerTable: React.FC<PlayerTableProps> = ({ players = [] }) => {
       <Table striped align='left'>
         {table.getHeaderGroups().map((headerGroup) => (
           <Table.Head key={headerGroup.id}>
-            <Table.HeadCell className='p-2 w-8'></Table.HeadCell>
-            <Table.HeadCell className='p-2 w-8'></Table.HeadCell>
             {headerGroup.headers.map((header) => {
               return (
                 <Table.HeadCell
@@ -237,27 +266,18 @@ export const PlayerTable: React.FC<PlayerTableProps> = ({ players = [] }) => {
         <Table.Body>
           {table
             .getRowModel()
-            .rows.slice(0, 10)
+            .rows.slice(0, 250)
             .map((row) => {
-              console.log(row);
               return (
                 <Table.Row key={row.id}>
-                  <Table.Cell className='p-2 w-8'>
-                    <DraftedCheckbox
-                      isDrafted={row.original.drafted}
-                      playerId={row.original.id}
-                    />
-                  </Table.Cell>
-                  <Table.Cell className='p-2 w-8'>
-                    <WatchlistCheckbox
-                      isWatching={row.original.watching}
-                      playerId={row.original.id}
-                    />
-                  </Table.Cell>
                   {row.getVisibleCells().map((cell) => {
-                    // console.log(cell);
+                    const classes = cn(
+                      'p-0 px-2',
+                      cell.column.id === 'expected-points' ? 'font-bold' : '',
+                      typeof cell.getValue() === 'number' ? 'font-mono' : '',
+                    );
                     return (
-                      <Table.Cell key={cell.id} className='p-2'>
+                      <Table.Cell key={cell.id} className={classes}>
                         {flexRender(
                           cell.column.columnDef.cell,
                           cell.getContext(),
