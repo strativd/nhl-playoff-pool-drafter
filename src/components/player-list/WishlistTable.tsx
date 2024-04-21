@@ -7,6 +7,8 @@ import {
 import { Table } from 'flowbite-react';
 import React from 'react';
 
+import { cn } from '@/lib/utils';
+
 import { PlayersData } from '@/database';
 
 type WishlistTableProps = {
@@ -33,28 +35,26 @@ export const WishlistTable: React.FC<WishlistTableProps> = ({
         id: 'name',
       },
       {
-        accessorKey: 'goals',
-        header: 'G',
+        accessorKey: 'expectedPoints',
+        header: 'xPTS',
+        id: 'expected-points',
       },
       {
-        accessorKey: 'assists',
-        header: 'A',
-      },
-      {
-        accessorKey: 'points',
-        header: 'P',
-      },
-      {
-        accessorKey: 'powerPlayPoints',
-        header: 'PP',
-      },
-      {
-        accessorKey: 'shortHandedPoints',
-        header: 'SH',
+        accessorKey: 'pointsPerGame',
+        header: 'PTS/G',
+        id: 'points-per-game',
       },
       {
         accessorKey: 'gamesPlayed',
         header: 'GP',
+      },
+      {
+        accessorKey: 'points',
+        header: 'PTS',
+      },
+      {
+        accessorKey: 'powerPlayPoints',
+        header: 'PP',
       },
     ],
     [],
@@ -76,7 +76,7 @@ export const WishlistTable: React.FC<WishlistTableProps> = ({
                 <Table.HeadCell
                   key={header.id}
                   colSpan={header.colSpan}
-                  className='p-2'
+                  className='p-1'
                 >
                   {flexRender(
                     header.column.columnDef.header,
@@ -89,12 +89,16 @@ export const WishlistTable: React.FC<WishlistTableProps> = ({
         ))}
         <Table.Body>
           {table.getRowModel().rows.map((row) => {
-            console.log(row);
             return (
               <Table.Row key={row.id}>
                 {row.getVisibleCells().map((cell) => {
+                  const classes = cn(
+                    'p-1',
+                    cell.column.id === 'expected-points' ? 'font-bold' : '',
+                    typeof cell.getValue() === 'number' ? 'font-mono' : '',
+                  );
                   return (
-                    <Table.Cell key={cell.id} className='p-2'>
+                    <Table.Cell key={cell.id} className={classes}>
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext(),
